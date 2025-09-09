@@ -4,27 +4,86 @@ author: "Naseem Mohammad"
 date: "2025-09-09"
 output: html_document
 ---
+```{r}
+# This chunk loads our toolboxes.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# If you have never installed these packages, you must run these two lines first.
+# To do this, put your cursor on a line and press Ctrl+Enter.
+# install.packages("tidyverse")
+# install.packages("lubridate")
+
+# Now, we load the packages for this session.
+library(tidyverse)
+library(lubridate)
+```
+```{r}
+# This chunk loads our first dataset
+orders <- read_csv("data/olist_orders_dataset.csv")
+# Load the customers dataset
+customers <- read_csv("data/olist_customers_dataset.csv")
+# Load the payments dataset
+payments <- read_csv("data/olist_order_payments_dataset.csv")
+```
+```{r}
+# This chunk joins our three tables into one
+olist_data <- orders %>%
+  inner_join(customers, by = "customer_id") %>%
+  inner_join(payments, by = "order_id")
 ```
 
-## R Markdown
+```{r}
+# This chunk filters our data to keep only what we need
+states_to_keep <- c("SP", "RJ", "MG")
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+analysis_data_filtered <- olist_data %>%
+  filter(order_status == "delivered") %>%
+  filter(customer_state %in% states_to_keep)
+```
+```{r}
+# This chunk creates our final analysis table
+daily_sales <- analysis_data_filtered %>%
+  mutate(date = as_date(order_purchase_timestamp)) %>%
+  group_by(date, customer_state) %>%
+  summarise(sales_revenue = sum(payment_value), .groups = 'drop')
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Show the first 6 rows of the final table
+head(daily_sales)
+```
+```{r}
+# This chunk creates our main project visualization
+intervention_date <- as_date("2017-11-01")
 
-```{r cars}
-summary(cars)
+ggplot(daily_sales, aes(x = date, y = sales_revenue, color = customer_state)) +
+  geom_line(alpha = 0.8, size = 1) +
+  geom_vline(xintercept = intervention_date, linetype = "dashed", color = "black") +
+  labs(
+    title = "Daily Sales Revenue: Treatment vs. Control",
+    subtitle = "Visual check for the parallel trends assumption",
+    x = "Date",
+    y = "Total Daily Sales Revenue",
+    color = "State"
+  ) +
+  theme_minimal()
+```
+```{r}
+# This chunk prepares the final variables for our model
+analysis_data <- daily_sales %>%
+  mutate(
+    time = if_else(date >= intervention_date, 1, 0),
+    treatment = if_else(customer_state == "SP", 1, 0),
+    treatment_post = time * treatment
+  )
+```
+```{r}
+# This chunk runs our final model
+
+# First, make sure you have the 'fixest' package installed
+# install.packages("fixest")
+library(fixest)
+
+# Run the model and print the summary table
+advanced_model <- feols(log(sales_revenue) ~ treatment_post | customer_state + date, data = analysis_data)
+
+# summary(advanced_model)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
