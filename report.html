@@ -472,7 +472,17 @@ library(fixest)
 # Run the model and print the summary table
 advanced_model &lt;- feols(log(sales_revenue) ~ treatment_post | customer_state + date, data = analysis_data)</code></pre>
 <pre><code>## NOTE: 0/1 fixed-effect singleton was removed (1 observation).</code></pre>
-<pre class="r"><code># summary(advanced_model)</code></pre>
+<pre class="r"><code>summary(advanced_model)</code></pre>
+<pre><code>## OLS estimation, Dep. Var.: log(sales_revenue)
+## Observations: 1,818
+## Fixed-effects: customer_state: 3,  date: 609
+## Standard-errors: IID 
+##                Estimate Std. Error t value   Pr(&gt;|t|)    
+## treatment_post 0.196973   0.040498 4.86379 1.3037e-06 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## RMSE: 0.331687     Adj. R2: 0.817499
+##                  Within R2: 0.019238</code></pre>
 
 
 

@@ -84,6 +84,6 @@ library(fixest)
 # Run the model and print the summary table
 advanced_model <- feols(log(sales_revenue) ~ treatment_post | customer_state + date, data = analysis_data)
 
-# summary(advanced_model)
+summary(advanced_model)
 ```
 
