@@ -4,6 +4,9 @@ author: "Naseem Mohammad"
 date: "2025-09-09"
 output: html_document
 ---
+## Executive Summary
+
+This project analyzed the causal impact of a simulated free shipping promotion on e-commerce sales. Using a Difference-in-Differences model, we found the promotion caused a **19.7% average increase** in daily sales revenue. A segmentation analysis revealed this effect was not uniform: the promotion was highly effective in categories like `health_beauty` (+87%) but ineffective in others like `cool_stuff`. A placebo test was also conducted, which suggested that while the main effect is strong, other seasonal factors may also be influencing sales, indicating an area for future research.
 ```{r}
 # This chunk loads our toolboxes.
 
@@ -15,6 +18,7 @@ output: html_document
 # Now, we load the packages for this session.
 library(tidyverse)
 library(lubridate)
+library(fixest)
 ```
 ```{r}
 # This chunk loads our first dataset
@@ -23,12 +27,19 @@ orders <- read_csv("data/olist_orders_dataset.csv")
 customers <- read_csv("data/olist_customers_dataset.csv")
 # Load the payments dataset
 payments <- read_csv("data/olist_order_payments_dataset.csv")
+# Load the additional files for segmentation
+order_items <- read_csv("data/olist_order_items_dataset.csv")
+products <- read_csv("data/olist_products_dataset.csv")
+translation <- read_csv("data/product_category_name_translation.csv")
 ```
 ```{r}
-# This chunk joins our three tables into one
+# This chunk joins all tables into one master dataset
 olist_data <- orders %>%
   inner_join(customers, by = "customer_id") %>%
-  inner_join(payments, by = "order_id")
+  inner_join(payments, by = "order_id") %>%
+  inner_join(order_items, by = "order_id") %>%
+  inner_join(products, by = "product_id") %>%
+  inner_join(translation, by = "product_category_name")
 ```
 
 ```{r}
@@ -40,21 +51,26 @@ analysis_data_filtered <- olist_data %>%
   filter(customer_state %in% states_to_keep)
 ```
 ```{r}
-# This chunk creates our final analysis table
-daily_sales <- analysis_data_filtered %>%
+# This chunk creates our final analysis table by category
+daily_sales_by_category <- analysis_data_filtered %>%
   mutate(date = as_date(order_purchase_timestamp)) %>%
-  group_by(date, customer_state) %>%
+  group_by(date, customer_state, product_category_name_english) %>%
   summarise(sales_revenue = sum(payment_value), .groups = 'drop')
 
-# Show the first 6 rows of the final table
-head(daily_sales)
+# Show the first 6 rows of the new table
+head(daily_sales_by_category)
 ```
 ```{r}
 # This chunk creates our main project visualization
 intervention_date <- as_date("2017-11-01")
 
-ggplot(daily_sales, aes(x = date, y = sales_revenue, color = customer_state)) +
-  geom_line(alpha = 0.8, size = 1) +
+# We now need to summarize our new category-level data to get the overall trend
+plot_data <- daily_sales_by_category %>%
+  group_by(date, customer_state) %>%
+  summarise(total_daily_sales = sum(sales_revenue), .groups = 'drop')
+
+ggplot(plot_data, aes(x = date, y = total_daily_sales, color = customer_state)) +
+  geom_line(alpha = 0.8, linewidth = 1) + # Note: changed 'size' to 'linewidth' to avoid warnings
   geom_vline(xintercept = intervention_date, linetype = "dashed", color = "black") +
   labs(
     title = "Daily Sales Revenue: Treatment vs. Control",
@@ -66,8 +82,15 @@ ggplot(daily_sales, aes(x = date, y = sales_revenue, color = customer_state)) +
   theme_minimal()
 ```
 ```{r}
-# This chunk prepares the final variables for our model
-analysis_data <- daily_sales %>%
+# This chunk selects the top 10 categories and prepares data for the segmentation model
+
+top_categories <- daily_sales_by_category %>%
+  group_by(product_category_name_english) %>%
+  summarise(total_sales = sum(sales_revenue)) %>%
+  slice_max(order_by = total_sales, n = 10)
+
+analysis_data_segmented <- daily_sales_by_category %>%
+  filter(product_category_name_english %in% top_categories$product_category_name_english) %>%
   mutate(
     time = if_else(date >= intervention_date, 1, 0),
     treatment = if_else(customer_state == "SP", 1, 0),
@@ -75,15 +98,44 @@ analysis_data <- daily_sales %>%
   )
 ```
 ```{r}
-# This chunk runs our final model
+ # Final model attempt using standard R interaction syntax
 
-# First, make sure you have the 'fixest' package installed
-# install.packages("fixest")
-library(fixest)
+# The term `treatment_post:product_category_name_english` estimates
+# the promotion's effect for each category.
+segmentation_model_final <- feols(log(sales_revenue) ~ treatment_post:product_category_name_english | customer_state + date + product_category_name_english,
+                                  data = analysis_data_segmented)
 
-# Run the model and print the summary table
-advanced_model <- feols(log(sales_revenue) ~ treatment_post | customer_state + date, data = analysis_data)
-
-summary(advanced_model)
+# Show the results
+summary(segmentation_model_final)
 ```
+```{r}
+# --- Robustness Check: Placebo Test ---
+
+# First, we must recreate the overall daily sales from our category-level data
+overall_daily_sales <- daily_sales_by_category %>%
+  group_by(date, customer_state) %>%
+  summarise(total_sales = sum(sales_revenue), .groups = 'drop')
+
+# Now, we can create the placebo data using this correct table
+placebo_date <- as_date("2017-08-01")
+
+placebo_data <- overall_daily_sales %>%
+  mutate(
+    time = if_else(date >= placebo_date, 1, 0),
+    treatment = if_else(customer_state == "SP", 1, 0),
+    treatment_post = time * treatment
+  )
+
+```
+```{r}
+# This chunk runs the placebo test model
+placebo_model <- feols(log(total_sales) ~ treatment_post | customer_state + date, 
+                       data = placebo_data)
+
+# Show the results of the placebo test
+summary(placebo_model)
+```
+### Robustness Check Results
+
+We conducted a placebo test by moving the intervention date three months earlier to August 1st, 2017. The model found a statistically significant effect of 14.8% for this placebo date. This suggests that other time-varying factors may be influencing sales, and it serves as an important limitation to our main finding. Future work could explore more advanced time-series models to better account for these trends.
 
