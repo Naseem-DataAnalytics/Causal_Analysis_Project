@@ -4,20 +4,32 @@ This R project analyzes the causal impact of a simulated "free shipping" promoti
 
 ---
 
-## Key Findings
+## 📊 Key Results
 
-* **Overall Effect**: The promotion caused a **statistically significant 19.7% average increase** in daily sales revenue.
-* **Segmented Effect**: The impact was not uniform across product categories. The promotion was highly effective for `health_beauty` (+87%) and `bed_bath_table` (+75%), but was ineffective for categories like `cool_stuff` (-18.6%).
-* **Robustness**: A placebo test was conducted which found a smaller but still significant effect on a fake intervention date. This suggests the main finding is strong, but other seasonal factors may also be influencing sales, indicating an area for future work.
+### 1. Sales Trends Before & After Promotion
+
+![Sales Trends Plot](outputs/sales_trends.png)
+*Dashed line = promotion start. The plot shows that the sales trend for the treatment state (SP) diverges upwards from the control states after the promotion, supporting the core assumption of our model.*
+
+### 2. Category-Level Promotion Effects
+
+![Category Effects Plot](outputs/promotion_effects.png)
+*The promotion was not uniformly effective. The bar chart clearly shows a strong, statistically significant lift for categories like `health_beauty`, while others like `cool_stuff` saw a negative effect.*
 
 ---
 
-## Methodology
+## 🔧 Methods & Tools
+* **Data Wrangling**: `tidyverse`, `lubridate`
+* **Modeling**: Two-Way Fixed Effects Regression (`fixest::feols`)
+* **Validation**: Placebo Test for Robustness
+* **Visualization**: `ggplot2`
+* **Reporting**: R Markdown
 
-The core of the analysis is a **Difference-in-Differences (DiD)** model, implemented as a **Two-Way Fixed Effects (TWFE)** regression using the `fixest` R package. This quasi-experimental method isolates the causal effect of the promotion by controlling for time-invariant state-specific trends and common shocks that affect all states over time.
+## 🎓 Learning Reflection 
 
-## Project Structure
+This project helped me practice:
+* Joining and cleaning multiple relational datasets, with a focus on data quality assurance.
+* Applying causal inference methods (Difference-in-Differences, Placebo Test).
+* Translating complex regression results into business-ready insights and visualizations.
 
-* `report.Rmd`: The fully documented and reproducible R Markdown notebook containing all code for data preparation, analysis, and visualization.
-* `report.html`: The final, polished HTML report with all findings, plots, and tables.
-* `data/`: Folder containing the raw CSV files used in the analysis.
+I also recognized key limitations (seasonality, model assumptions) and proposed improvements (A/B testing). I look forward to developing these skills further during the Google Data Analytics Apprenticeship.
