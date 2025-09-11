@@ -6,6 +6,8 @@ This R project analyzes the causal impact of a simulated free shipping promotion
 ---
 ## 📌 Executive Summary
 
+[**View the Live HTML Report**](https://naseem-dataanalytics.github.io/Causal_Analysis_Project/report.html)
+
 * **What happened**: The free shipping promotion increased sales overall, but the impact was not uniform across categories.
 * **So what**: Blanket promotions are inefficient; targeted promotions maximize ROI.
 * **Key result**: The `health_beauty` category saw an **82.6% lift**, equal to **R$69** in additional daily profit.
