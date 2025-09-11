@@ -1,4 +1,5 @@
 # 📦 Causal Impact Analysis of a Sales Promotion
+Estimated +R$69/day in profit through targeted promotions
 
 This R project analyzes the causal impact of a simulated free shipping promotion on e-commerce sales using the Olist dataset from Brazil. The goal was to estimate the promotion’s effectiveness, test its robustness, and translate findings into actionable business recommendations.
 
