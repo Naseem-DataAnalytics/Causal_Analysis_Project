@@ -1,8 +1,6 @@
 # 📦 Causal Impact Analysis of a Sales Promotion
 
-This R project analyzes the causal impact of a simulated free shipping promotion on e-commerce sales using the Olist dataset from Brazil.
-
-The goal was to estimate the promotion’s effectiveness, test its robustness, and translate findings into actionable business recommendations.
+This R project analyzes the causal impact of a simulated free shipping promotion on e-commerce sales using the Olist dataset from Brazil. The goal was to estimate the promotion’s effectiveness, test its robustness, and translate findings into actionable business recommendations.
 
 ---
 ## 📌 Executive Summary
@@ -11,6 +9,16 @@ The goal was to estimate the promotion’s effectiveness, test its robustness, a
 * **So what**: Blanket promotions are inefficient; targeted promotions maximize ROI.
 * **Key result**: The `health_beauty` category saw an **82.6% lift**, equal to **R$69** in additional daily profit.
 * **What’s next**: Pilot targeted promotions in top-performing categories and validate with a controlled A/B test.
+
+---
+## 📂 Project Structure
+├── data/              # Raw Olist dataset (CSV files)
+├── outputs/           # Saved plots (.png files)
+│   ├── sales_trends.png
+│   ├── promotion_effects.png
+├── report.Rmd         # Main analysis (RMarkdown notebook)
+├── report.html        # Final polished HTML report
+└── README.md          # Project documentation (this file)
 
 ---
 ## 📊 Key Results
@@ -32,6 +40,7 @@ The goal was to estimate the promotion’s effectiveness, test its robustness, a
 * **Validation**: Placebo Test for robustness
 * **Visualization**: `ggplot2`
 * **Reporting**: R Markdown
+* **Version Control**: Git & GitHub
 
 ---
 ## 💡 Strategic Recommendations
@@ -41,7 +50,7 @@ The goal was to estimate the promotion’s effectiveness, test its robustness, a
 * **Next Step**: Confirm findings with a formal A/B test to reduce risk of seasonal bias.
 
 ---
-## ⚠️ Limitations
+## ⚠️ Limitations & Assumptions
 * **Placebo Test**: A false positive effect (14.8%) appeared when shifting the promotion date earlier, suggesting seasonality may confound results.
 * **Model Assumptions**: Difference-in-differences relies on parallel trends; future work could test advanced time-series or causal impact models.
 
@@ -57,6 +66,7 @@ I also recognized key limitations (seasonality, model assumptions) and proposed 
 ---
 ## 🚀 How to Reproduce
 1.  Clone this repository.
-2.  Download the Olist dataset and place the necessary CSV files in the `data/` folder.
-3.  Open the `.Rproj` file in RStudio.
-4.  Run the `report.Rmd` file.
+2.  Download the dataset from Kaggle: [Olist Brazilian E-Commerce Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
+3.  Place the necessary CSV files in the `data/` folder.
+4.  Open the `.Rproj` file in RStudio.
+5.  Run the `report.Rmd` file.
