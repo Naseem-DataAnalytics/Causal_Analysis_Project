@@ -4,23 +4,22 @@ author: "Naseem Mohammad"
 date: "2025-09-09"
 output: html_document
 ---
+
 ## Executive Summary
 
-This project analyzed the causal impact of a simulated free shipping promotion on e-commerce sales. Using a Difference-in-Differences model, we found the promotion caused a **19.7% average increase** in daily sales revenue. A segmentation analysis revealed this effect was not uniform: the promotion was highly effective in categories like `health_beauty` (+87%) but ineffective in others like `cool_stuff`. A placebo test was also conducted, which suggested that while the main effect is strong, other seasonal factors may also be influencing sales, indicating an area for future research.
-```{r}
-# This chunk loads our toolboxes.
+This project analyzed the causal impact of a simulated free shipping promotion, with an initial focus on data quality assurance. A segmentation analysis revealed the promotion's effect was highly variable across product categories: it drove a statistically significant **82.6% sales lift** for `health_beauty` but was ineffective for others. This lift for the `health_beauty` category alone is estimated to generate an additional **R\$69 in daily profit**. While the findings for high-performing categories are strong, a placebo test indicated that other seasonal factors may also be influencing sales, marking an area for future work.
 
-# If you have never installed these packages, you must run these two lines first.
-# To do this, put your cursor on a line and press Ctrl+Enter.
+```{r setup, include=FALSE}
+# This chunk loads our toolboxes.
 # install.packages("tidyverse")
 # install.packages("lubridate")
-
 # Now, we load the packages for this session.
 library(tidyverse)
 library(lubridate)
 library(fixest)
 ```
-```{r}
+
+```{r load-data, echo=FALSE, message=FALSE, warning=FALSE}
 # This chunk loads our first dataset
 orders <- read_csv("data/olist_orders_dataset.csv")
 # Load the customers dataset
@@ -32,35 +31,41 @@ order_items <- read_csv("data/olist_order_items_dataset.csv")
 products <- read_csv("data/olist_products_dataset.csv")
 translation <- read_csv("data/product_category_name_translation.csv")
 ```
-```{r}
-# This chunk joins all tables into one master dataset
-olist_data <- orders %>%
+
+```{r join-data, echo=FALSE, warning=FALSE}
+# This chunk creates a clean master table at the ORDER-ITEM level
+# to avoid double-counting sales.
+order_item_data <- orders %>%
   inner_join(customers, by = "customer_id") %>%
-  inner_join(payments, by = "order_id") %>%
   inner_join(order_items, by = "order_id") %>%
   inner_join(products, by = "product_id") %>%
-  inner_join(translation, by = "product_category_name")
+  inner_join(translation, by = "product_category_name") %>%
+  # Create the correct revenue for each item
+  mutate(item_revenue = price + freight_value)
 ```
 
-```{r}
-# This chunk filters our data to keep only what we need
+```{r filter-data, echo=FALSE}
+# This chunk filters our corrected data to keep only what we need
 states_to_keep <- c("SP", "RJ", "MG")
 
-analysis_data_filtered <- olist_data %>%
+analysis_data_filtered <- order_item_data %>%
   filter(order_status == "delivered") %>%
   filter(customer_state %in% states_to_keep)
 ```
-```{r}
+
+```{r aggregate-data, echo=FALSE}
 # This chunk creates our final analysis table by category
 daily_sales_by_category <- analysis_data_filtered %>%
   mutate(date = as_date(order_purchase_timestamp)) %>%
   group_by(date, customer_state, product_category_name_english) %>%
-  summarise(sales_revenue = sum(payment_value), .groups = 'drop')
+  summarise(sales_revenue = sum(item_revenue), .groups = 'drop') # This line is now corrected
 
 # Show the first 6 rows of the new table
 head(daily_sales_by_category)
+
 ```
-```{r}
+
+```{r plot-trends, echo=FALSE}
 # This chunk creates our main project visualization
 intervention_date <- as_date("2017-11-01")
 
@@ -81,7 +86,8 @@ ggplot(plot_data, aes(x = date, y = total_daily_sales, color = customer_state)) 
   ) +
   theme_minimal()
 ```
-```{r}
+
+```{r prep-segment-data, echo=FALSE}
 # This chunk selects the top 10 categories and prepares data for the segmentation model
 
 top_categories <- daily_sales_by_category %>%
@@ -97,7 +103,8 @@ analysis_data_segmented <- daily_sales_by_category %>%
     treatment_post = time * treatment
   )
 ```
-```{r}
+
+```{r run-segment-model, echo=FALSE}
  # Final model attempt using standard R interaction syntax
 
 # The term `treatment_post:product_category_name_english` estimates
@@ -108,7 +115,8 @@ segmentation_model_final <- feols(log(sales_revenue) ~ treatment_post:product_ca
 # Show the results
 summary(segmentation_model_final)
 ```
-```{r}
+
+```{r prep-placebo-data, include=FALSE}
 # --- Robustness Check: Placebo Test ---
 
 # First, we must recreate the overall daily sales from our category-level data
@@ -127,7 +135,8 @@ placebo_data <- overall_daily_sales %>%
   )
 
 ```
-```{r}
+
+```{r run-placebo-model, include=FALSE}
 # This chunk runs the placebo test model
 placebo_model <- feols(log(total_sales) ~ treatment_post | customer_state + date, 
                        data = placebo_data)
@@ -135,7 +144,94 @@ placebo_model <- feols(log(total_sales) ~ treatment_post | customer_state + date
 # Show the results of the placebo test
 summary(placebo_model)
 ```
+
 ### Robustness Check Results
 
 We conducted a placebo test by moving the intervention date three months earlier to August 1st, 2017. The model found a statistically significant effect of 14.8% for this placebo date. This suggests that other time-varying factors may be influencing sales, and it serves as an important limitation to our main finding. Future work could explore more advanced time-series models to better account for these trends.
 
+```{r tidy-results, echo=FALSE}
+# This chunk tidies the model results for plotting
+library(broom)
+
+# Extract the coefficients from the CORRECT model object
+segmented_results <- tidy(segmentation_model_final) %>%
+  # Clean up the term names for better labels
+  mutate(term = str_remove(term, "treatment_post:product_category_name_english")) %>%
+  rename(category = term)
+
+# View the new, clean table
+segmented_results
+```
+
+```{r plot-segmentation, echo=FALSE}
+# This chunk creates the final bar chart of segmented results
+
+# We add a column to tell if the result is statistically significant
+segmented_results_with_significance <- segmented_results %>%
+  mutate(significant = if_else(p.value < 0.05, "Yes", "No"))
+
+ggplot(segmented_results_with_significance, aes(x = fct_reorder(category, estimate), y = estimate, fill = significant)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = estimate - 1.96 * std.error, ymax = estimate + 1.96 * std.error), width = 0.2) +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("Yes" = "darkgreen", "No" = "grey50")) +
+  labs(
+    title = "Promotion Effect by Product Category",
+    subtitle = "Estimated % increase in daily sales with 95% confidence intervals",
+    x = "Product Category",
+    y = "Estimated Effect on Sales"
+  ) +
+  theme_minimal()
+```
+
+```{r financial-impact, include=FALSE}
+# --- Estimate Financial Impact ---
+
+# 1. Isolate the 'health_beauty' category data in SP before the promotion
+health_beauty_before <- analysis_data_segmented %>%
+  filter(product_category_name_english == "health_beauty",
+         time == 0,        # The 'before' period
+         treatment == 1)   # In our treatment state (SP)
+
+# 2. Calculate the average daily sales for this category before the promotion
+avg_daily_sales_before <- mean(health_beauty_before$sales_revenue, na.rm = TRUE)
+
+# 3. Get our estimated effect for this category from the model results
+effect_health_beauty <- segmented_results %>%
+  filter(category == "health_beauty") %>%
+  pull(estimate) # pull() extracts a single value from a table
+
+# 4. Calculate the estimated lift in daily revenue
+estimated_revenue_lift_per_day <- avg_daily_sales_before * effect_health_beauty
+
+# Print the result
+estimated_revenue_lift_per_day
+
+# 5. Assume a 20% profit margin and calculate the profit lift
+profit_margin <- 0.20
+estimated_profit_lift_per_day <- estimated_revenue_lift_per_day * profit_margin
+
+# Print the final profit estimate
+estimated_profit_lift_per_day
+```
+
+## Conclusion
+
+After correcting for a data quality issue that was inflating sales figures, this analysis provides a more accurate and nuanced view of the promotion's impact. The key insight is the importance of segmentation. The promotion's massive success in high-performing categories (e.g., +82.6% for `health_beauty`) suggests a targeted marketing strategy would yield a much higher ROI than a site-wide campaign. Our financial estimate of over R\$69 in additional daily profit from this single category alone strongly supports this. The failed placebo test serves as a reminder that this model is an estimate, and further analysis into the data's underlying seasonality is recommended to refine these findings.
+
+---
+
+## Strategic Recommendations & Next Steps
+
+The key takeaways from this analysis are:
+
+* **What Happened**: Our free shipping promotion successfully increased sales, but the effect was highly concentrated in specific product categories.
+
+* **So What?**: Blanket promotions are inefficient. We can achieve a much higher return on investment (ROI) by focusing our marketing efforts. Based on our model, the promotion in the `health_beauty` category alone generated an estimated **R$69 in extra profit per day**.
+
+* **What's Next?**:
+    1.  **Recommendation**: Pilot a new, targeted promotion for only the top-performing categories (like `health_beauty` and `bed_bath_table`).
+    2.  **Future Analysis**: Explore *why* the promotion was so effective for these categories. Do they share common features, like higher profit margins or different customer behaviors (e.g., more repeat purchases)?
+    3.  **Confirm with an Experiment**: To be 100% certain, the ideal next step would be to design and run a formal A/B test to confirm these findings before a full-scale rollout.
